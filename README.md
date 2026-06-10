@@ -22,6 +22,16 @@ You're in the right place.
 
 ---
 
+## Changelog Generator
+
+Generate a structured `CHANGELOG.md` from git history with Added, Fixed, Changed, and Removed sections.
+
+1. Copy `changelog.sh` into any git repository.
+2. Run `bash changelog.sh`.
+3. Review and commit the generated `CHANGELOG.md`.
+
+---
+
 ## Active Bounties
 
 | # | Task | Amount | Status |
