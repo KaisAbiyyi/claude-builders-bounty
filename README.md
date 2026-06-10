@@ -22,6 +22,21 @@ You're in the right place.
 
 ---
 
+## PR Review CLI
+
+Generate a structured Markdown review for a public GitHub pull request.
+
+Setup and usage:
+
+```sh
+chmod +x claude-review
+./claude-review --pr https://github.com/owner/repo/pull/123
+```
+
+The output includes a 2-3 sentence summary, identified risks, improvement suggestions, changed files, and a Low/Medium/High confidence score. A Claude Code sub-agent prompt is available at `examples/pr-review-agent.md`.
+
+---
+
 ## Active Bounties
 
 | # | Task | Amount | Status |
