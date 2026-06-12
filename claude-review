@@ -50,6 +50,10 @@ def parse_pr_url(pr_url: str) -> tuple[str, str, str]:
     return match.group(1), match.group(2), match.group(3)
 
 
+def canonical_pr_url(owner: str, repo: str, number: str) -> str:
+    return f"https://github.com/{owner}/{repo}/pull/{number}"
+
+
 def parse_diff(diff: str) -> list[FileChange]:
     files: list[FileChange] = []
     current: FileChange | None = None
@@ -90,7 +94,6 @@ def summarize(pr: dict, files: list[FileChange]) -> str:
 def identify_risks(files: list[FileChange], diff: str) -> list[str]:
     risks: list[str] = []
     paths = [file.path.lower() for file in files]
-    lower_diff = diff.lower()
 
     if any(path.endswith((".env", ".pem", ".key")) or ".env" in path for path in paths):
         risks.append("Sensitive configuration files appear in the diff; verify no secrets or machine-specific values are committed.")
@@ -98,7 +101,7 @@ def identify_risks(files: list[FileChange], diff: str) -> list[str]:
         risks.append("Dependency lockfiles changed; confirm the package manager update was intentional and reviewed.")
     if any(".github/workflows/" in path for path in paths):
         risks.append("CI workflow files changed; check permissions, token scopes, and trigger behavior carefully.")
-    if re.search(r"\b(delete from|drop table|truncate|rm -rf|--force)\b", lower_diff):
+    if re.search(r"\b(delete from|drop table|truncate|rm -rf|--force)\b", diff, re.IGNORECASE):
         risks.append("The diff contains destructive command or SQL terms; confirm they are examples/tests rather than executable unsafe paths.")
     if sum(file.additions + file.deletions for file in files) > 500:
         risks.append("Large diff size increases review risk; consider asking for smaller commits or targeted test evidence.")
@@ -172,6 +175,7 @@ def main() -> int:
 
     try:
         owner, repo, number = parse_pr_url(args.pr)
+        pr_url = canonical_pr_url(owner, repo, number)
         api_base = f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
         try:
             pr = fetch_json(api_base)
@@ -179,9 +183,9 @@ def main() -> int:
             if exc.code != 403:
                 raise
             pr = {"title": f"{owner}/{repo}#{number}"}
-        diff = fetch_text(args.pr + ".diff")
+        diff = fetch_text(f"{pr_url}.diff")
         files = parse_diff(diff)
-        print(render_markdown(args.pr, pr, files, diff))
+        print(render_markdown(pr_url, pr, files, diff))
     except (urllib.error.URLError, urllib.error.HTTPError, ValueError) as exc:
         print(f"claude-review: {exc}", file=sys.stderr)
         return 1
