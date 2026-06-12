@@ -37,7 +37,13 @@ add_entry() {
   esac
 }
 
-while IFS='|' read -r hash subject; do
+contains_word() {
+  local haystack=" $1 "
+  local needle="$2"
+  [[ "$haystack" == *" $needle "* ]]
+}
+
+while IFS=$'\x1f' read -r hash subject; do
   [[ -z "${subject:-}" ]] && continue
 
   lower_subject="$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')"
@@ -51,48 +57,64 @@ while IFS='|' read -r hash subject; do
     fix|fixed|bug|bugfix|resolve|patch) add_entry fixed "$entry" ;;
     remove|removed|delete|deleted|drop|dropped|deprecate) add_entry removed "$entry" ;;
     *)
-      case "$lower_subject" in
-    *" add "*|*" added "*|*" create "*|*" implement "*) add_entry added "$entry" ;;
-    *" fix "*|*" fixed "*|*" bug "*|*" resolve "*) add_entry fixed "$entry" ;;
-    *" remove "*|*" removed "*|*" delete "*|*" drop "*) add_entry removed "$entry" ;;
-    *) add_entry changed "$entry" ;;
-      esac
+      if contains_word "$lower_subject" add \
+        || contains_word "$lower_subject" added \
+        || contains_word "$lower_subject" create \
+        || contains_word "$lower_subject" implement; then
+        add_entry added "$entry"
+      elif contains_word "$lower_subject" fix \
+        || contains_word "$lower_subject" fixed \
+        || contains_word "$lower_subject" bug \
+        || contains_word "$lower_subject" resolve; then
+        add_entry fixed "$entry"
+      elif contains_word "$lower_subject" remove \
+        || contains_word "$lower_subject" removed \
+        || contains_word "$lower_subject" delete \
+        || contains_word "$lower_subject" drop; then
+        add_entry removed "$entry"
+      else
+        add_entry changed "$entry"
+      fi
       ;;
   esac
-done < <(git log --no-merges --date-order --format='%h|%s' ${range})
+done < <(git log --no-merges --date-order --format='%h%x1f%s' ${range})
+
+has_entries=false
+if (( ${#added[@]} > 0 || ${#fixed[@]} > 0 || ${#changed[@]} > 0 || ${#removed[@]} > 0 )); then
+  has_entries=true
+fi
 
 {
   printf '# Changelog\n\n'
   printf '## %s - %s\n\n' "$today" "$range_label"
   printf 'Repository: `%s`\n\n' "$repo_name"
 
-  if (( ${#added[@]} == 0 && ${#fixed[@]} == 0 && ${#changed[@]} == 0 && ${#removed[@]} == 0 )); then
+  if [[ "$has_entries" == false ]]; then
     printf 'No commits found for this range.\n'
-    exit 0
-  fi
+  else
+    if (( ${#added[@]} > 0 )); then
+      printf '### Added\n'
+      printf '%s\n' "${added[@]}"
+      printf '\n'
+    fi
 
-  if (( ${#added[@]} > 0 )); then
-    printf '### Added\n'
-    printf '%s\n' "${added[@]}"
-    printf '\n'
-  fi
+    if (( ${#fixed[@]} > 0 )); then
+      printf '### Fixed\n'
+      printf '%s\n' "${fixed[@]}"
+      printf '\n'
+    fi
 
-  if (( ${#fixed[@]} > 0 )); then
-    printf '### Fixed\n'
-    printf '%s\n' "${fixed[@]}"
-    printf '\n'
-  fi
+    if (( ${#changed[@]} > 0 )); then
+      printf '### Changed\n'
+      printf '%s\n' "${changed[@]}"
+      printf '\n'
+    fi
 
-  if (( ${#changed[@]} > 0 )); then
-    printf '### Changed\n'
-    printf '%s\n' "${changed[@]}"
-    printf '\n'
-  fi
-
-  if (( ${#removed[@]} > 0 )); then
-    printf '### Removed\n'
-    printf '%s\n' "${removed[@]}"
-    printf '\n'
+    if (( ${#removed[@]} > 0 )); then
+      printf '### Removed\n'
+      printf '%s\n' "${removed[@]}"
+      printf '\n'
+    fi
   fi
 } > "$output_file"
 
