@@ -9,6 +9,8 @@ Project guidance for a greenfield SaaS app using Next.js 15 App Router, React Se
 - TypeScript with `strict` enabled.
 - SQLite as the primary database.
 - Drizzle ORM is the default data layer because it keeps migrations explicit, works well with SQLite/libSQL, and avoids a separate schema runtime.
+- Use `better-sqlite3` only in the Node.js runtime for embedded or local development. It is a native addon and is not compatible with the Edge runtime.
+- Use Turso/libSQL, or another shared database, for hosted multi-instance or serverless deployments. Do not use `file:` SQLite URLs when instances have separate filesystems or concurrent locking/consistency requirements.
 - Server Actions are allowed for simple mutations, but route handlers are preferred for public API boundaries and webhook-style integrations.
 - Tailwind CSS plus small local UI primitives are preferred over a large component framework until product workflows prove repeated patterns.
 
@@ -109,7 +111,7 @@ Define and validate environment variables in `lib/env.ts`.
 Expected baseline:
 
 ```text
-DATABASE_URL=file:./local.db
+DATABASE_URL=file:./data/local.db
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 AUTH_SECRET=<generated-secret>
 ```
@@ -117,6 +119,8 @@ AUTH_SECRET=<generated-secret>
 - Prefix only browser-safe values with `NEXT_PUBLIC_`.
 - Fail fast when required server variables are missing.
 - Keep example values in `.env.example`.
+- Treat `file:` database URLs as local/development-only and keep the target path gitignored.
+- For hosted Turso/libSQL deployments, prefer a shared URL such as `DATABASE_URL=libsql://<database>.turso.io` plus the auth token environment variable required by the selected client.
 
 Reason: leaking secrets through `NEXT_PUBLIC_` is easy in Next.js. A typed env module creates one place to review runtime requirements.
 
