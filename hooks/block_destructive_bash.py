@@ -16,7 +16,10 @@ LOG_PATH = Path(os.environ.get("CLAUDE_BLOCK_LOG", Path.home() / ".claude" / "ho
 RULES = (
     (
         "rm -rf",
-        re.compile(r"(^|[\s;&|()])rm\s+-(?:[A-Za-z]*r[A-Za-z]*f|[A-Za-z]*f[A-Za-z]*r)[A-Za-z]*\b"),
+        re.compile(
+            r"(^|[\s;&|()])rm\b(?=[^;&|()]*\s-[A-Za-z]*r)(?=[^;&|()]*\s-[A-Za-z]*f)",
+            re.IGNORECASE,
+        ),
         "Recursive forced remove commands are blocked.",
     ),
     (

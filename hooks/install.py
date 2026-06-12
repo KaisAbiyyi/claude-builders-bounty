@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import stat
+import sys
 from pathlib import Path
 
 
@@ -30,16 +31,23 @@ HOOK_ENTRY = {
 def load_settings() -> dict:
     if not SETTINGS_PATH.exists():
         return {}
-    with SETTINGS_PATH.open("r", encoding="utf-8") as settings_file:
-        return json.load(settings_file)
+    try:
+        with SETTINGS_PATH.open("r", encoding="utf-8") as settings_file:
+            return json.load(settings_file)
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(f"Cannot read valid Claude settings from {SETTINGS_PATH}: {exc}") from exc
 
 
 def main() -> int:
     HOOK_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copy2(SOURCE_HOOK, TARGET_HOOK)
-    TARGET_HOOK.chmod(TARGET_HOOK.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    TARGET_HOOK.chmod(TARGET_HOOK.stat().st_mode | stat.S_IXUSR)
 
-    settings = load_settings()
+    try:
+        settings = load_settings()
+    except RuntimeError as exc:
+        print(exc, file=sys.stderr)
+        return 1
     hooks = settings.setdefault("hooks", {})
     pre_tool_use = hooks.setdefault("PreToolUse", [])
 

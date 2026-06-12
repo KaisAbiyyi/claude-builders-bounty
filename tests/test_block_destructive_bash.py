@@ -42,8 +42,11 @@ class BlockDestructiveBashTest(unittest.TestCase):
     def test_blocks_destructive_patterns(self):
         blocked = [
             "rm -rf dist",
+            "rm -r -f dist",
+            "rm -f -r dist",
             "psql -c 'DROP TABLE users'",
             "git push --force origin main",
+            "git push -f origin main",
             "mysql -e 'TRUNCATE sessions'",
             "psql -c 'DELETE FROM users'",
         ]
