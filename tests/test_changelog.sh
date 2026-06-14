@@ -5,6 +5,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
 
+grep -q '^name: generate-changelog$' "$root/.claude/skills/generate-changelog/SKILL.md"
+grep -q '^tools: Bash$' "$root/.claude/skills/generate-changelog/SKILL.md"
+
 git -C "$fixture" init -q
 git -C "$fixture" config user.email test@example.com
 git -C "$fixture" config user.name Test
