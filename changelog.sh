@@ -18,6 +18,8 @@ added=()
 fixed=()
 changed=()
 removed=()
+breaking=()
+breaking_subject_re='^[[:alpha:]]+(\([^)]+\))?!:'
 
 normalize_subject() {
   local subject="$1"
@@ -30,6 +32,7 @@ add_entry() {
   local line="$2"
 
   case "$category" in
+    breaking) breaking+=("$line") ;;
     added) added+=("$line") ;;
     fixed) fixed+=("$line") ;;
     removed) removed+=("$line") ;;
@@ -43,7 +46,8 @@ contains_word() {
   [[ "$haystack" == *" $needle "* ]]
 }
 
-while IFS=$'\x1f' read -r hash subject; do
+while IFS= read -r -d $'\x1e' record; do
+  IFS=$'\x1f' read -r hash subject body <<< "$record"
   [[ -z "${subject:-}" ]] && continue
 
   lower_subject="$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')"
@@ -52,11 +56,15 @@ while IFS=$'\x1f' read -r hash subject; do
   clean_subject="$(normalize_subject "$subject")"
   entry="- ${clean_subject} (${hash})"
 
-  case "$prefix" in
-    feat|add|added|create|implement) add_entry added "$entry" ;;
-    fix|fixed|bug|bugfix|resolve|patch) add_entry fixed "$entry" ;;
-    remove|removed|delete|deleted|drop|dropped|deprecate) add_entry removed "$entry" ;;
-    *)
+  if [[ "$subject" =~ $breaking_subject_re ]] \
+    || printf '%s\n' "${body:-}" | grep -Eiq '^BREAKING[ -]CHANGE:'; then
+    add_entry breaking "$entry"
+  else
+    case "$prefix" in
+      feat|add|added|create|implement) add_entry added "$entry" ;;
+      fix|fixed|bug|bugfix|resolve|patch) add_entry fixed "$entry" ;;
+      remove|removed|delete|deleted|drop|dropped|deprecate) add_entry removed "$entry" ;;
+      *)
       if contains_word "$lower_subject" add \
         || contains_word "$lower_subject" added \
         || contains_word "$lower_subject" create \
@@ -76,11 +84,12 @@ while IFS=$'\x1f' read -r hash subject; do
         add_entry changed "$entry"
       fi
       ;;
-  esac
-done < <(git log --no-merges --date-order --format='%h%x1f%s' ${range})
+    esac
+  fi
+done < <(git log --no-merges --date-order --format='%h%x1f%s%x1f%b%x1e' ${range})
 
 has_entries=false
-if (( ${#added[@]} > 0 || ${#fixed[@]} > 0 || ${#changed[@]} > 0 || ${#removed[@]} > 0 )); then
+if (( ${#breaking[@]} > 0 || ${#added[@]} > 0 || ${#fixed[@]} > 0 || ${#changed[@]} > 0 || ${#removed[@]} > 0 )); then
   has_entries=true
 fi
 
@@ -92,6 +101,12 @@ fi
   if [[ "$has_entries" == false ]]; then
     printf 'No commits found for this range.\n'
   else
+    if (( ${#breaking[@]} > 0 )); then
+      printf '### Breaking Changes\n'
+      printf '%s\n' "${breaking[@]}"
+      printf '\n'
+    fi
+
     if (( ${#added[@]} > 0 )); then
       printf '### Added\n'
       printf '%s\n' "${added[@]}"
