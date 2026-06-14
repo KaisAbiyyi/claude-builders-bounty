@@ -33,7 +33,7 @@ chmod +x claude-review
 ./claude-review --pr https://github.com/owner/repo/pull/123
 ```
 
-The output includes a 2-3 sentence summary, identified risks, improvement suggestions, changed files, and a Low/Medium/High confidence score. A Claude Code sub-agent prompt is available at `examples/pr-review-agent.md`.
+The output includes a 2-3 sentence summary, identified risks, improvement suggestions, changed files, and a Low/Medium/High confidence score. The canonical Claude Code sub-agent is available at `.claude/agents/pr-reviewer.md`.
 
 For offline and CI testing, pass a local unified diff:
 

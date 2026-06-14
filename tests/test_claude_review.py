@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = ROOT / "claude-review"
+AGENT = ROOT / ".claude" / "agents" / "pr-reviewer.md"
 MODULE = runpy.run_path(str(CLI))
 
 parse_pr_url = MODULE["parse_pr_url"]
@@ -28,6 +29,12 @@ index 1111111..2222222 100644
 
 
 class ClaudeReviewTest(unittest.TestCase):
+    def test_canonical_agent_manifest(self):
+        agent = AGENT.read_text(encoding="utf-8")
+        self.assertIn("name: pr-reviewer", agent)
+        self.assertIn("tools: Bash, Read, Grep", agent)
+        self.assertIn("### Confidence score", agent)
+
     def test_accepts_pr_url_suffix_and_canonicalizes_it(self):
         parts = parse_pr_url("https://github.com/owner/repo/pull/123/files?tab=files")
         self.assertEqual(parts, ("owner", "repo", "123"))
