@@ -9,6 +9,7 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
 
@@ -97,6 +98,11 @@ def identify_risks(files: list[FileChange], diff: str) -> list[str]:
 
     if any(path.endswith((".env", ".pem", ".key")) or ".env" in path for path in paths):
         risks.append("Sensitive configuration files appear in the diff; verify no secrets or machine-specific values are committed.")
+    if re.search(
+        r"""(?im)^\+.*\b(api[_-]?key|[a-z0-9_]*(?:token|password|secret)[a-z0-9_]*)\s*[:=]\s*["'][^"']+["']""",
+        diff,
+    ):
+        risks.append("A credential-like literal was added; verify it is a harmless fixture and not a real secret.")
     if any(path.endswith(("package-lock.json", "pnpm-lock.yaml", "yarn.lock")) for path in paths):
         risks.append("Dependency lockfiles changed; confirm the package manager update was intentional and reviewed.")
     if any(".github/workflows/" in path for path in paths):
@@ -171,22 +177,28 @@ Source: {pr_url}
 def main() -> int:
     parser = argparse.ArgumentParser(description="Review a GitHub PR and print a structured Markdown comment.")
     parser.add_argument("--pr", required=True, help="GitHub pull request URL")
+    parser.add_argument("--diff-file", help="Review a local unified diff instead of fetching it from GitHub")
+    parser.add_argument("--title", help="PR title to use with --diff-file")
     args = parser.parse_args()
 
     try:
         owner, repo, number = parse_pr_url(args.pr)
         pr_url = canonical_pr_url(owner, repo, number)
-        api_base = f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
-        try:
-            pr = fetch_json(api_base)
-        except urllib.error.HTTPError as exc:
-            if exc.code != 403:
-                raise
-            pr = {"title": f"{owner}/{repo}#{number}"}
-        diff = fetch_text(f"{pr_url}.diff")
+        if args.diff_file:
+            pr = {"title": args.title or f"{owner}/{repo}#{number}"}
+            diff = Path(args.diff_file).read_text(encoding="utf-8")
+        else:
+            api_base = f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
+            try:
+                pr = fetch_json(api_base)
+            except urllib.error.HTTPError as exc:
+                if exc.code != 403:
+                    raise
+                pr = {"title": f"{owner}/{repo}#{number}"}
+            diff = fetch_text(f"{pr_url}.diff")
         files = parse_diff(diff)
         print(render_markdown(pr_url, pr, files, diff))
-    except (urllib.error.URLError, urllib.error.HTTPError, ValueError) as exc:
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError, ValueError) as exc:
         print(f"claude-review: {exc}", file=sys.stderr)
         return 1
 

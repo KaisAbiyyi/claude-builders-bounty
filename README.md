@@ -35,6 +35,13 @@ chmod +x claude-review
 
 The output includes a 2-3 sentence summary, identified risks, improvement suggestions, changed files, and a Low/Medium/High confidence score. A Claude Code sub-agent prompt is available at `examples/pr-review-agent.md`.
 
+For offline and CI testing, pass a local unified diff:
+
+```sh
+./claude-review --pr https://github.com/owner/repo/pull/123 --diff-file change.diff --title "Local review"
+python -m unittest discover -s tests -v
+```
+
 ---
 
 ## Active Bounties
