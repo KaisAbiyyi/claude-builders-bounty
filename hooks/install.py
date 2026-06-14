@@ -13,18 +13,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_HOOK = REPO_ROOT / "hooks" / "block_destructive_bash.py"
-CLAUDE_DIR = Path.home() / ".claude"
+CLAUDE_DIR = Path(os.environ.get("CLAUDE_HOME", Path.home() / ".claude")).expanduser()
 HOOK_DIR = CLAUDE_DIR / "hooks"
 TARGET_HOOK = HOOK_DIR / "block_destructive_bash.py"
 SETTINGS_PATH = CLAUDE_DIR / "settings.json"
 HOOK_ENTRY = {
     "matcher": "Bash",
-    "hooks": [
-        {
-            "type": "command",
-            "command": 'python3 "$HOME/.claude/hooks/block_destructive_bash.py"',
-        }
-    ],
+    "hooks": [{"type": "command", "command": f'"{sys.executable}" "{TARGET_HOOK}"'}],
 }
 
 
@@ -54,9 +49,11 @@ def main() -> int:
     if HOOK_ENTRY not in pre_tool_use:
         pre_tool_use.append(HOOK_ENTRY)
 
-    with SETTINGS_PATH.open("w", encoding="utf-8") as settings_file:
+    temporary_settings = SETTINGS_PATH.with_suffix(".json.tmp")
+    with temporary_settings.open("w", encoding="utf-8") as settings_file:
         json.dump(settings, settings_file, indent=2)
         settings_file.write("\n")
+    temporary_settings.replace(SETTINGS_PATH)
 
     print(f"Installed hook: {TARGET_HOOK}")
     print(f"Updated settings: {SETTINGS_PATH}")
