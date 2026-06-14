@@ -39,6 +39,7 @@ db/
   migrations/
 features/
   billing/
+  organizations/
   projects/
   users/
 lib/
@@ -90,6 +91,7 @@ Reason: Server Components reduce bundle size and simplify data loading, but the 
 - Add indexes in the same migration as the query pattern that needs them.
 - Prefer foreign keys with explicit `on delete` behavior. Use cascading deletes only when child records have no audit value.
 - Keep raw SQL in migration files or clearly named query helpers. Do not embed ad hoc SQL strings inside React components.
+- Describe rollback and data backfill behavior in the PR for every migration, even when the migration tool only runs forward.
 
 Reason: SQLite makes local iteration easy, but production safety depends on migrations being reviewable and deterministic. Indexes and foreign-key behavior should be discussed with the schema change that introduces the access pattern.
 
@@ -101,8 +103,19 @@ Reason: SQLite makes local iteration easy, but production safety depends on migr
 - Keep read queries and write mutations near the feature they serve unless they are shared across several features.
 - Wrap multi-step writes in transactions.
 - Do not run database writes during render. Use Server Actions, route handlers, or explicit service functions.
+- Scope every tenant-owned query by `organization_id`; never rely on a client-provided record ID alone.
 
 Reason: SQLite performs well when access is predictable. Centralized client creation prevents duplicate connections and makes Turso/local switching boring.
+
+## Auth, Tenancy, And Caching
+
+- Perform authentication and authorization in the server function that reads or mutates data.
+- Treat `organization_id` as part of every tenant-owned lookup, update, and delete.
+- Keep role checks in one server-only policy module instead of scattering role strings across components.
+- Include actor, organization, target record, and action in audit logs for billing and administrative mutations.
+- Use `revalidatePath`, `revalidateTag`, or an explicit no-store boundary after mutations; do not let authenticated dashboards inherit accidental public caching.
+
+Reason: hiding controls in the browser is not authorization, and stale cross-tenant data is both a correctness and security failure.
 
 ## Environment Variables
 
@@ -212,4 +225,6 @@ Then check:
 - New database behavior includes a migration.
 - Server/client boundaries are explicit.
 - Expected validation and authorization failures are covered.
+- Tenant-owned queries prove cross-organization access is rejected.
+- Migration PRs explain rollback, backfill, and deployment ordering.
 - The PR description explains the user-facing behavior, not only the files changed.
